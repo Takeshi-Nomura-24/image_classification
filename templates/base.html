@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}AI Image Classifier{% endblock %}</title>
+    <style>
+        :root {
+            --primary-color: #4a90e2;
+            --success-color: #48bb78;
+            --danger-color: #e53e3e;
+            --bg-color: #f4f7f6;
+            --card-bg: rgba(255, 255, 255, 0.95);
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            margin: 0; padding: 0;
+            background: linear-gradient(135deg, #e0eafc 0%, #cfdef3 100%);
+            background-attachment: fixed;
+            min-height: 100vh;
+        }
+
+        /* ナビゲーションバー */
+        nav {
+            background: white;
+            padding: 10px 20px;
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+        }
+
+        .nav-btn {
+            text-decoration: none;
+            color: #4a5568;
+            font-weight: bold;
+            padding: 8px 16px;
+            border-radius: 8px;
+            transition: 0.3s;
+        }
+
+        .nav-btn:hover { background: #edf2f7; color: var(--primary-color); }
+        .nav-btn.active { background: var(--primary-color); color: white; }
+
+        .app-container {
+            max-width: 900px;
+            margin: 40px auto;
+            background: var(--card-bg);
+            padding: 40px;
+            border-radius: 20px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 15px 35px rgba(0,0,0,0.1);
+            box-sizing: border-box;
+        }
+
+        @media (max-width: 768px) {
+            .app-container { margin: 20px 10px; padding: 25px 20px; }
+        }
+
+        {% block extra_css %}{% endblock %}
+    </style>
+</head>
+<body>
+
+<nav>
+    <a href="{% url 'predict:index' %}" class="nav-btn {% if request.resolver_match.url_name == 'index' %}active{% endif %}">📸 解析する</a>
+    <a href="{% url 'predict:view_data' %}" class="nav-btn {% if request.resolver_match.url_name == 'view_data' %}active{% endif %}">📜 履歴を見る</a>
+</nav>
+
+<div class="app-container">
+    {% block content %}{% endblock %}
+</div>
+
+{% block extra_js %}{% endblock %}
+
+</body>
+</html>

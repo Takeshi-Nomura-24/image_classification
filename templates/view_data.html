@@ -1,0 +1,64 @@
+{% extends 'base.html' %}
+
+{% block title %}解析履歴 - AI Classifier{% endblock %}
+
+{% block extra_css %}
+/* ページネーション用のスタイル */
+.pagination {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-top: 30px;
+    gap: 10px;
+}
+.page-link {
+    text-decoration: none;
+    padding: 8px 16px;
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    color: var(--primary-color);
+    font-weight: bold;
+    transition: 0.3s;
+}
+.page-link:hover { background: #edf2f7; }
+.current-page { font-weight: bold; color: #4a5568; }
+{% endblock %}
+
+{% block content %}
+    <h1 style="text-align: center; color: #2d3748; margin-bottom: 30px;">解析履歴</h1>
+
+    {% for res in results %}
+    <div style="background: #fff; border: 1px solid #eee; border-radius: 12px; padding: 15px; margin-bottom: 15px; display: flex; align-items: center; gap: 20px;">
+        <img src="{{ res.image.url }}" style="width: 80px; height: 80px; object-fit: cover; border-radius: 8px;">
+        <div style="flex-grow: 1;">
+            <strong style="font-size: 1.1rem; display: block;">{{ res.prediction_label }}</strong>
+            <span style="color: var(--success-color); font-size: 0.9rem;">確信度: {{ res.prediction_score }}%</span>
+            <small style="color: #a0aec0; display: block;">{{ res.created_at|date:"Y/m/d H:i" }}</small>
+        </div>
+        <a href="{% url 'predict:delete_data' res.pk %}" 
+           style="background: var(--danger-color); color: white; padding: 8px 12px; border-radius: 6px; text-decoration: none; font-size: 0.85rem;"
+           onclick="return confirm('削除しますか？')">削除</a>
+    </div>
+    {% empty %}
+    <p style="text-align: center; color: #a0aec0;">履歴はまだありません。</p>
+    {% endfor %}
+
+    {% if results.has_other_pages %}
+    <div class="pagination">
+        {% if results.has_previous %}
+            <a href="?page=1" class="page-link">&laquo; 最初</a>
+            <a href="?page={{ results.previous_page_number }}" class="page-link">前へ</a>
+        {% endif %}
+
+        <span class="current-page">
+            {{ results.number }} / {{ results.paginator.num_pages }}
+        </span>
+
+        {% if results.has_next %}
+            <a href="?page={{ results.next_page_number }}" class="page-link">次へ</a>
+            <a href="?page={{ results.paginator.num_pages }}" class="page-link">最後 &raquo;</a>
+        {% endif %}
+    </div>
+    {% endif %}
+{% endblock %}
