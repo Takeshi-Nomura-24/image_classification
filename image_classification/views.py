@@ -1,61 +1,58 @@
+import os
+from django.conf import settings
+from django.shortcuts import render, redirect
+from .forms import ImageUploadForm
+from .models import Prediction
+# 軽量なMobileNetV2をインポート
+from tensorflow.keras.applications.mobilenet_v2 import MobileNetV2, preprocess_input, decode_predictions
+from tensorflow.keras.preprocessing import image
 import numpy as np
-import cv2
-import base64
-from django.apps import apps
-from django.shortcuts import render
-from keras.applications.vgg16 import preprocess_input, decode_predictions
 
-def index(request):
-    context = {}
-    if request.method == "POST" and request.FILES.get("imageFile"):
-        file = request.FILES["imageFile"]
+# サーバー起動時に一度だけモデルをロード（メモリ節約のため）
+# weights='imagenet' で学習済みデータをダウンロードします
+model = MobileNetV2(weights='imagenet')
 
-        try:
-            # 1. OpenCVでメモリ上で読み込む (ディスク保存をスキップ)
-            file_bytes = np.asarray(bytearray(file.read()), dtype=np.uint8)
-            img_bgr = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
-            
-            # 2. VGG16用の前処理
-            # OpenCVはBGR、Keras(VGG16)はRGBを期待するため変換
-            img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
-            img_res = cv2.resize(img_rgb, (224, 224))
-            
-            x = np.expand_dims(img_res, axis=0)
-            x = preprocess_input(x.astype(np.float32))
+def predict(request):
+    if request.method == 'POST':
+        form = ImageUploadForm(request.POST, request.FILES)
+        if form.is_valid():
+            # 画像の保存
+            instance = form.save()
+            img_path = os.path.join(settings.MEDIA_ROOT, instance.image.name)
 
-            # 3. ロード済みモデルの取得
-            app_config = apps.get_app_config('image_classification')
-            model = app_config.image_model
-            
-            if model is None:
-                # from tensorflow.keras.applications.vgg16 import VGG16
-                from keras.applications.vgg16 import VGG16
-                model = VGG16(weights='imagenet')
+            # 画像の読み込みと前処理
+            img = image.load_img(img_path, target_size=(224, 224))
+            img_array = image.img_to_array(img)
+            img_array = np.expand_dims(img_array, axis=0)
+            img_array = preprocess_input(img_array)
 
-            # 4. 推論
-            preds = model.predict(x)
-            decoded_results = decode_predictions(preds, top=3)[0]
+            # AI推論の実行
+            preds = model.predict(img_array)
+            # 解析結果のデコード（上位3つを取得）
+            results = decode_predictions(preds, top=3)[0]
 
-            # 5. 結果をリストにまとめて洗練化
-            predictions = []
-            for _, name, prob in decoded_results:
-                predictions.append({
-                    "name": name.replace('_', ' ').capitalize(), # ラベルを見やすく整形
-                    "prob": f"{prob:.2%}",
-                    "raw_prob": prob * 100 # CSSのバーなどで使う用
-                })
+            # 最も確率が高い結果を保存
+            instance.prediction_label = results[0][1] # カテゴリ名
+            instance.prediction_score = float(results[0][2]) # 確率
+            instance.save()
 
-            # 6. 表示用に画像をBase64文字列に変換
-            _, buffer = cv2.imencode('.jpg', img_bgr)
-            img_str = base64.b64encode(buffer).decode('utf-8')
+            return render(request, 'predict/result.html', {
+                'prediction': instance,
+                'all_predictions': results,
+            })
+    else:
+        form = ImageUploadForm()
+    
+    # 履歴を表示するためにすべてのデータを取得（新しい順）
+    history = Prediction.objects.all().order_by('-created_at')
+    return render(request, 'predict/index.html', {'form': form, 'history': history})
 
-            context = {
-                "predictions": predictions,
-                "image_data": f"data:image/jpeg;base64,{img_str}",
-            }
-
-        except Exception as e:
-            print(f"Error: {e}")
-            context = {"error_msg": "画像の解析に失敗しました。形式を確認してください。"}
-
-    return render(request, "index.html", context)
+def delete_prediction(request, pk):
+    """履歴を削除するための関数"""
+    prediction = Prediction.objects.get(pk=pk)
+    # 画像ファイル自体も削除する場合（任意）
+    if prediction.image:
+        if os.path.isfile(prediction.image.path):
+            os.remove(prediction.image.path)
+    prediction.delete()
+    return redirect('predict')
