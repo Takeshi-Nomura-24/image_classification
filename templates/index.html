@@ -1,0 +1,60 @@
+{% extends 'base.html' %}
+
+{% block title %}画像解析 - AI Classifier{% endblock %}
+
+{% block content %}
+    <h1 style="text-align: center; color: #2d3748;">AI Image Classifier</h1>
+
+    <div class="upload-section" style="text-align: center;">
+        <form method="post" enctype="multipart/form-data" id="mainForm">
+            {% csrf_token %}
+            <input type="file" name="imageFile" id="imageInput" accept="image/*" required style="margin-bottom: 20px;">
+            <br>
+            <img id="preview-before-upload" style="max-width: 100%; max-height: 300px; border-radius: 10px; display: none; margin-bottom: 20px;">
+            <input type="submit" value="解析を開始する" class="submit-btn" id="submitBtn" 
+                   style="background: var(--primary-color); color: white; border: none; padding: 15px 40px; border-radius: 30px; font-size: 18px; font-weight: bold; width: 100%; cursor: pointer;">
+        </form>
+        <div id="loading-overlay" style="display: none; margin-top: 20px; font-weight: bold; color: var(--primary-color);">🚀 AI解析中...</div>
+    </div>
+
+    {% if predictions %}
+    <div class="result-layout" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 40px; margin-top: 50px; border-top: 2px solid #eee; padding-top: 40px;">
+        <img src="{{ image_data }}" style="width: 100%; border-radius: 15px; box-shadow: 0 5px 15px rgba(0,0,0,0.1);">
+        <div>
+            <h3 style="margin-top: 0;">AIの推論結果</h3>
+            {% for pred in predictions %}
+            <div style="margin-bottom: 20px;">
+                <div style="display: flex; justify-content: space-between; font-weight: bold;">
+                    <span>{{ pred.name }}</span><span>{{ pred.prob }}</span>
+                </div>
+                <div style="background: #edf2f7; border-radius: 10px; height: 12px; overflow: hidden;">
+                    <div style="background: var(--success-color); height: 100%; width: {{ pred.raw_prob }}%; transition: 1s;"></div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    const imageInput = document.getElementById('imageInput');
+    const preview = document.getElementById('preview-before-upload');
+    imageInput.addEventListener('change', function() {
+        const file = this.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = e => { preview.src = e.target.result; preview.style.display = 'inline-block'; }
+            reader.readAsDataURL(file);
+        }
+    });
+
+    const form = document.getElementById('mainForm');
+    form.onsubmit = () => {
+        document.getElementById('submitBtn').disabled = true;
+        document.getElementById('loading-overlay').style.display = "block";
+    };
+</script>
+{% endblock %}
+
