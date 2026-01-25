@@ -1,0 +1,10 @@
+# ローカル用変換スクリプト
+import tensorflow as tf
+import tf2onnx
+
+model = tf.keras.applications.MobileNetV2(weights='imagenet')
+spec = (tf.TensorSpec((None, 224, 224, 3), tf.float32, name="input"),)
+output_path = "mobilenet_v2.onnx"
+
+model_proto, _ = tf2onnx.convert.from_keras(model, input_signature=spec, opset=13, output_path=output_path)
+print("Conversion complete!")
