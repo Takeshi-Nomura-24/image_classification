@@ -1,11 +1,12 @@
+# apps.py
 from django.apps import AppConfig
-from keras.applications.vgg16 import VGG16
+# VGG16 を MobileNetV2 に変更
+from keras.applications.mobilenet_v2 import MobileNetV2
 
 class PredictConfig(AppConfig):
     default_auto_field = 'django.db.models.BigAutoField'
     name = 'predict'
 
     def ready(self):
-        # サーバー起動時に一度だけモデルをロード
-        self.model = VGG16(weights='imagenet')
-
+        # MobileNetV2 をロード (VGG16より圧倒的に軽いです)
+        self.model = MobileNetV2(weights='imagenet')
