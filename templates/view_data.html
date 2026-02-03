@@ -1,0 +1,652 @@
+{% extends 'base.html' %}
+
+{% block title %}解析履歴 - AI Classifier{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* ===== ページヘッダー ===== */
+    .page-header {
+        text-align: center;
+        margin-bottom: 2rem;
+    }
+
+    .page-title {
+        color: var(--text-color);
+        font-size: 2rem;
+        font-weight: 700;
+        margin-bottom: 0.5rem;
+    }
+
+    .page-subtitle {
+        color: var(--text-muted);
+        font-size: 1rem;
+    }
+
+    /* ===== 検索・フィルターエリア ===== */
+    .controls-section {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 2rem;
+        gap: 1rem;
+        flex-wrap: wrap;
+    }
+
+    .search-box {
+        flex: 1;
+        max-width: 400px;
+        position: relative;
+    }
+
+    .search-input {
+        width: 100%;
+        padding: 0.75rem 1rem 0.75rem 2.5rem;
+        border: 2px solid var(--border-color);
+        border-radius: 10px;
+        font-size: 0.95rem;
+        transition: var(--transition);
+    }
+
+    .search-input:focus {
+        outline: none;
+        border-color: var(--primary-color);
+        box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.1);
+    }
+
+    .search-icon {
+        position: absolute;
+        left: 0.875rem;
+        top: 50%;
+        transform: translateY(-50%);
+        color: var(--text-muted);
+        font-size: 1.2rem;
+    }
+
+    .stats-info {
+        display: flex;
+        gap: 1.5rem;
+        align-items: center;
+        font-size: 0.95rem;
+        color: var(--text-muted);
+    }
+
+    .stat-item {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .stat-value {
+        font-weight: 700;
+        color: var(--primary-color);
+        font-size: 1.1rem;
+    }
+
+    /* ===== 履歴アイテム ===== */
+    .history-list {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+    }
+
+    .history-item {
+        background: white;
+        border: 2px solid var(--border-color);
+        border-radius: 12px;
+        padding: 1.25rem;
+        display: flex;
+        align-items: center;
+        gap: 1.5rem;
+        transition: var(--transition);
+        position: relative;
+        overflow: hidden;
+    }
+
+    .history-item:hover {
+        border-color: var(--primary-color);
+        box-shadow: var(--shadow-md);
+        transform: translateY(-2px);
+    }
+
+    /* 確信度に応じた左側のカラーバー */
+    .history-item::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        width: 4px;
+        background: linear-gradient(180deg, var(--success-color), var(--primary-color));
+    }
+
+    .history-item.low-confidence::before {
+        background: linear-gradient(180deg, var(--warning-color), var(--danger-color));
+    }
+
+    /* ===== サムネイル画像 ===== */
+    .thumbnail-wrapper {
+        position: relative;
+        flex-shrink: 0;
+    }
+
+    .thumbnail {
+        width: 100px;
+        height: 100px;
+        object-fit: cover;
+        border-radius: 10px;
+        box-shadow: var(--shadow-sm);
+        cursor: pointer;
+        transition: var(--transition);
+    }
+
+    .thumbnail:hover {
+        transform: scale(1.05);
+        box-shadow: var(--shadow-md);
+    }
+
+    .confidence-badge {
+        position: absolute;
+        bottom: -8px;
+        right: -8px;
+        background: white;
+        padding: 0.25rem 0.5rem;
+        border-radius: 12px;
+        font-size: 0.75rem;
+        font-weight: 700;
+        box-shadow: var(--shadow-sm);
+        border: 2px solid white;
+    }
+
+    .confidence-badge.high {
+        color: var(--success-color);
+    }
+
+    .confidence-badge.medium {
+        color: var(--warning-color);
+    }
+
+    .confidence-badge.low {
+        color: var(--danger-color);
+    }
+
+    /* ===== 履歴詳細情報 ===== */
+    .history-details {
+        flex-grow: 1;
+        min-width: 0;
+    }
+
+    .history-label {
+        font-size: 1.2rem;
+        font-weight: 700;
+        color: var(--text-color);
+        margin-bottom: 0.5rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .label-icon {
+        font-size: 1.3rem;
+    }
+
+    .history-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 1rem;
+        font-size: 0.9rem;
+        color: var(--text-muted);
+        margin-bottom: 0.5rem;
+    }
+
+    .meta-item {
+        display: flex;
+        align-items: center;
+        gap: 0.375rem;
+    }
+
+    .confidence-bar-wrapper {
+        margin-top: 0.75rem;
+        background: #f7fafc;
+        height: 8px;
+        border-radius: 4px;
+        overflow: hidden;
+    }
+
+    .confidence-bar {
+        height: 100%;
+        border-radius: 4px;
+        transition: width 0.5s ease-out;
+    }
+
+    .confidence-bar.high {
+        background: linear-gradient(90deg, var(--success-color), #38a169);
+    }
+
+    .confidence-bar.medium {
+        background: linear-gradient(90deg, var(--warning-color), #dd6b20);
+    }
+
+    .confidence-bar.low {
+        background: linear-gradient(90deg, var(--danger-color), #c53030);
+    }
+
+    /* ===== アクションボタン ===== */
+    .history-actions {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+        flex-shrink: 0;
+    }
+
+    .action-btn {
+        padding: 0.5rem 1rem;
+        border-radius: 8px;
+        text-decoration: none;
+        font-size: 0.85rem;
+        font-weight: 600;
+        text-align: center;
+        transition: var(--transition);
+        border: none;
+        cursor: pointer;
+        white-space: nowrap;
+    }
+
+    .btn-delete {
+        background: var(--danger-color);
+        color: white;
+    }
+
+    .btn-delete:hover {
+        background: #c53030;
+        transform: translateY(-1px);
+    }
+
+    /* ===== 空の状態 ===== */
+    .empty-state {
+        text-align: center;
+        padding: 4rem 2rem;
+        color: var(--text-muted);
+    }
+
+    .empty-icon {
+        font-size: 4rem;
+        margin-bottom: 1rem;
+        opacity: 0.5;
+    }
+
+    .empty-title {
+        font-size: 1.5rem;
+        font-weight: 700;
+        margin-bottom: 0.5rem;
+        color: var(--text-color);
+    }
+
+    .empty-description {
+        font-size: 1rem;
+        margin-bottom: 2rem;
+    }
+
+    .empty-action {
+        display: inline-block;
+        padding: 0.875rem 2rem;
+        background: var(--primary-color);
+        color: white;
+        text-decoration: none;
+        border-radius: 50px;
+        font-weight: 600;
+        transition: var(--transition);
+    }
+
+    .empty-action:hover {
+        background: var(--primary-dark);
+        transform: translateY(-2px);
+    }
+
+    /* ===== ページネーション ===== */
+    .pagination {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        margin-top: 2.5rem;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+    }
+
+    .page-link {
+        text-decoration: none;
+        padding: 0.625rem 1rem;
+        background: white;
+        border: 2px solid var(--border-color);
+        border-radius: 8px;
+        color: var(--primary-color);
+        font-weight: 600;
+        transition: var(--transition);
+        font-size: 0.9rem;
+    }
+
+    .page-link:hover {
+        background: var(--primary-color);
+        color: white;
+        border-color: var(--primary-color);
+        transform: translateY(-1px);
+    }
+
+    .page-link.disabled {
+        opacity: 0.5;
+        pointer-events: none;
+    }
+
+    .current-page {
+        padding: 0.625rem 1.25rem;
+        background: var(--primary-color);
+        color: white;
+        border-radius: 8px;
+        font-weight: 700;
+        font-size: 0.9rem;
+    }
+
+    /* ===== モーダル（画像拡大表示用） ===== */
+    .modal {
+        display: none;
+        position: fixed;
+        z-index: 4000;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.9);
+        justify-content: center;
+        align-items: center;
+    }
+
+    .modal.show {
+        display: flex;
+    }
+
+    .modal-content {
+        max-width: 90%;
+        max-height: 90%;
+        border-radius: 12px;
+        box-shadow: 0 25px 50px rgba(0, 0, 0, 0.5);
+    }
+
+    .modal-close {
+        position: absolute;
+        top: 20px;
+        right: 30px;
+        color: white;
+        font-size: 3rem;
+        font-weight: bold;
+        cursor: pointer;
+        transition: var(--transition);
+    }
+
+    .modal-close:hover {
+        color: #ccc;
+        transform: scale(1.1);
+    }
+
+    /* ===== レスポンシブ対応 ===== */
+    @media (max-width: 768px) {
+        .controls-section {
+            flex-direction: column;
+            align-items: stretch;
+        }
+
+        .search-box {
+            max-width: none;
+        }
+
+        .stats-info {
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .history-item {
+            flex-direction: column;
+            align-items: flex-start;
+            padding: 1rem;
+        }
+
+        .thumbnail {
+            width: 100%;
+            height: 200px;
+        }
+
+        .history-actions {
+            flex-direction: row;
+            width: 100%;
+        }
+
+        .action-btn {
+            flex: 1;
+        }
+
+        .page-title {
+            font-size: 1.5rem;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+    <!-- ページヘッダー -->
+    <div class="page-header">
+        <h1 class="page-title">📜 解析履歴</h1>
+        <p class="page-subtitle">これまでに解析した画像の一覧です</p>
+    </div>
+
+    <!-- 検索・統計エリア -->
+    <div class="controls-section">
+        <!-- 検索ボックス -->
+        <form method="get" class="search-box">
+            <span class="search-icon">🔍</span>
+            <input 
+                type="text" 
+                name="search" 
+                class="search-input" 
+                placeholder="ラベルで検索..." 
+                value="{{ search_query|default:'' }}"
+            >
+        </form>
+
+        <!-- 統計情報 -->
+        <div class="stats-info">
+            <div class="stat-item">
+                <span>📊 総件数:</span>
+                <span class="stat-value">{{ results.paginator.count }}</span>
+            </div>
+            {% if results.paginator.num_pages > 1 %}
+            <div class="stat-item">
+                <span>📄 ページ:</span>
+                <span class="stat-value">{{ results.number }}/{{ results.paginator.num_pages }}</span>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- 履歴リスト -->
+    {% if results %}
+    <div class="history-list">
+        {% for res in results %}
+        <div class="history-item {% if res.prediction_score < 50 %}low-confidence{% endif %}">
+            <!-- サムネイル画像 -->
+            <div class="thumbnail-wrapper">
+                <img 
+                    src="{{ res.image.url }}" 
+                    class="thumbnail" 
+                    alt="{{ res.prediction_label }}"
+                    onclick="openModal('{{ res.image.url }}')"
+                >
+                <div class="confidence-badge {% if res.prediction_score >= 70 %}high{% elif res.prediction_score >= 50 %}medium{% else %}low{% endif %}">
+                    {{ res.prediction_score }}%
+                </div>
+            </div>
+
+            <!-- 詳細情報 -->
+            <div class="history-details">
+                <div class="history-label">
+                    <span class="label-icon">🎯</span>
+                    {{ res.prediction_label }}
+                </div>
+                
+                <div class="history-meta">
+                    <div class="meta-item">
+                        <span>📅</span>
+                        <span>{{ res.created_at|date:"Y年m月d日 H:i" }}</span>
+                    </div>
+                    {% if res.original_filename %}
+                    <div class="meta-item">
+                        <span>📄</span>
+                        <span>{{ res.original_filename }}</span>
+                    </div>
+                    {% endif %}
+                    {% if res.processing_time %}
+                    <div class="meta-item">
+                        <span>⏱️</span>
+                        <span>{{ res.processing_time|floatformat:2 }}秒</span>
+                    </div>
+                    {% endif %}
+                    <div class="meta-item">
+                        <span>🏷️</span>
+                        <span>{{ res.get_confidence_level }}</span>
+                    </div>
+                </div>
+
+                <!-- 確信度バー -->
+                <div class="confidence-bar-wrapper">
+                    <div class="confidence-bar {% if res.prediction_score >= 70 %}high{% elif res.prediction_score >= 50 %}medium{% else %}low{% endif %}" 
+                         style="width: {{ res.prediction_score }}%;">
+                    </div>
+                </div>
+            </div>
+
+            <!-- アクションボタン -->
+            <div class="history-actions">
+                <form method="post" action="{% url 'predict:delete_data' res.pk %}" style="margin: 0;">
+                    {% csrf_token %}
+                    <button 
+                        type="submit" 
+                        class="action-btn btn-delete"
+                        onclick="return confirm('「{{ res.prediction_label }}」の解析結果を削除しますか？\n\n画像ファイルも削除されます。');"
+                    >
+                        🗑️ 削除
+                    </button>
+                </form>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <!-- 空の状態 -->
+    <div class="empty-state">
+        <div class="empty-icon">📭</div>
+        <h2 class="empty-title">解析履歴がありません</h2>
+        <p class="empty-description">
+            {% if search_query %}
+            「{{ search_query }}」に一致する結果が見つかりませんでした。
+            {% else %}
+            まだ画像を解析していません。<br>
+            画像をアップロードして、AIに何が写っているか判定してもらいましょう！
+            {% endif %}
+        </p>
+        {% if not search_query %}
+        <a href="{% url 'predict:index' %}" class="empty-action">
+            📸 画像を解析する
+        </a>
+        {% else %}
+        <a href="{% url 'predict:view_data' %}" class="empty-action">
+            🔄 すべての履歴を表示
+        </a>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    <!-- ページネーション -->
+    {% if results.has_other_pages %}
+    <div class="pagination">
+        {% if results.has_previous %}
+            <a href="?page=1{% if search_query %}&search={{ search_query }}{% endif %}" class="page-link">
+                &laquo; 最初
+            </a>
+            <a href="?page={{ results.previous_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}" class="page-link">
+                前へ
+            </a>
+        {% else %}
+            <span class="page-link disabled">&laquo; 最初</span>
+            <span class="page-link disabled">前へ</span>
+        {% endif %}
+
+        <span class="current-page">
+            {{ results.number }} / {{ results.paginator.num_pages }}
+        </span>
+
+        {% if results.has_next %}
+            <a href="?page={{ results.next_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}" class="page-link">
+                次へ
+            </a>
+            <a href="?page={{ results.paginator.num_pages }}{% if search_query %}&search={{ search_query }}{% endif %}" class="page-link">
+                最後 &raquo;
+            </a>
+        {% else %}
+            <span class="page-link disabled">次へ</span>
+            <span class="page-link disabled">最後 &raquo;</span>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    <!-- 画像拡大表示モーダル -->
+    <div class="modal" id="imageModal" onclick="closeModal()">
+        <span class="modal-close">&times;</span>
+        <img class="modal-content" id="modalImage" alt="拡大画像">
+    </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // ===== 画像モーダル =====
+    function openModal(imageSrc) {
+        const modal = document.getElementById('imageModal');
+        const modalImg = document.getElementById('modalImage');
+        modal.classList.add('show');
+        modalImg.src = imageSrc;
+    }
+
+    function closeModal() {
+        const modal = document.getElementById('imageModal');
+        modal.classList.remove('show');
+    }
+
+    // Escキーでモーダルを閉じる
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            closeModal();
+        }
+    });
+
+    // ===== 確信度バーのアニメーション =====
+    document.addEventListener('DOMContentLoaded', function() {
+        const bars = document.querySelectorAll('.confidence-bar');
+        bars.forEach(bar => {
+            const width = bar.style.width;
+            bar.style.width = '0%';
+            setTimeout(() => {
+                bar.style.width = width;
+            }, 100);
+        });
+    });
+
+    // ===== 検索フォームの自動送信（オプション） =====
+    const searchInput = document.querySelector('.search-input');
+    let searchTimeout;
+    
+    searchInput.addEventListener('input', function() {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(() => {
+            if (this.value.length >= 2 || this.value.length === 0) {
+                this.form.submit();
+            }
+        }, 500); // 0.5秒の入力停止後に自動検索
+    });
+</script>
+{% endblock %}
